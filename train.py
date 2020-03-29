@@ -37,7 +37,7 @@ nnClassCount = len(class_names)                   # dimension of the output
 # TRANSFORM DATA
 
 normalize = transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-transformList = [transforms.RandomResizedCrop(imgtransCrop), transforms.ToTensor(), normalize]
+transformList = [transforms.ToTensor(), normalize]
 transformSequence = transforms.Compose(transformList)
 
 # LOAD DATASET

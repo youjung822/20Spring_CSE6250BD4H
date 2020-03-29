@@ -2,6 +2,8 @@ from torch.utils.data import Dataset
 from PIL import Image
 import torch
 import csv
+from os import path
+
 
 class CheXpertDataSet(Dataset):
     def __init__(self, image_list_file, transform=None, policy="ones"):
@@ -39,8 +41,14 @@ class CheXpertDataSet(Dataset):
                     else:
                         label[i] = 0
 
-                image_names.append('./' + image_name)
-                labels.append(label)
+
+                image_name = './' + image_name
+                dir_list = image_name.split('/')
+                dir_list[-1] = 'temp' + dir_list[-1]
+                transformed_image_name = '/'.join(dir_list)
+                if path.exists(transformed_image_name):
+                    image_names.append(transformed_image_name)
+                    labels.append(label)
 
         self.image_names = image_names
         self.labels = labels

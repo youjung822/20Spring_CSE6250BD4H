@@ -58,8 +58,10 @@ class CheXpertTrainer():
         model.train()
         len_training_data =  len(dataLoader)
         for batchID, (varInput, target) in enumerate(dataLoader):
-
-            varTarget = target.cuda(non_blocking=True)
+            if use_gpu:
+                varTarget = target.cuda(non_blocking=True)
+            else:
+                varTarget = target
 
             varOutput = model(varInput)
             lossvalue = loss(varOutput, varTarget)
@@ -71,8 +73,9 @@ class CheXpertTrainer():
             l = lossvalue.item()
             losstrain.append(l)
 
+            percentage = batchID // (len_training_data // 100)
             if batchID % (len_training_data // 100) == 0:
-                print(batchID // (len_training_data // 100), "% batches computed")
+                print(percentage, "% batches computed")
                 # Fill three arrays to see the evolution of the loss
 
                 batch.append(batchID)
@@ -83,6 +86,9 @@ class CheXpertTrainer():
                 print("Batch id: %d" % batchID)
                 print("Training loss: %.4f" % l)
                 print("Evaluation loss: %.4f" % le)
+                # for testing
+                # if percentage == 1:
+                #     break
 
         return batch, losstrain, losseval
 
@@ -97,7 +103,10 @@ class CheXpertTrainer():
 
         with torch.no_grad():
             for i, (varInput, target) in enumerate(dataLoader):
-                target = target.cuda(non_blocking=True)
+                if use_gpu:
+                    target = target.cuda(non_blocking=True)
+                else:
+                    target = target
                 varOutput = model(varInput)
 
                 losstensor = loss(varOutput, target)
