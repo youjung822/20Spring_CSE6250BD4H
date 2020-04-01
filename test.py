@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import sklearn.metrics as metrics
 
 out_gt_one, out_pred_one = \
-    CheXpertTrainer.test(model, dataLoaderTest, nnClassCount, "model_ones_densenet_1epoch.pth.tar", class_names)
+    CheXpertTrainer.test(model, dataLoaderTest, nnClassCount, "model_ones_densenet_preprocessed.pth.tar", class_names)
 # out_gt_zero, out_pred_zero = \
 #     CheXpertTrainer.test(model, dataLoaderTest, nnClassCount, "model_zeroes_densenet.pth.tar", class_names)
 
