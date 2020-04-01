@@ -54,7 +54,7 @@ def crop_all_images(df):
 
 def main():
 
-    patient_directories = [(f.path, f.name) for f in os.scandir("./CheXpert-v1.0-small/train") if f.is_dir()]
+    patient_directories = [(f.path, f.name) for f in os.scandir("./CheXpert-v1.0-small/study") if f.is_dir()]
     patient_directories_rdd = sc.parallelize(patient_directories)
     csv_rows = patient_directories_rdd.map(handle_patient_dir)
     csv_rows.saveAsTextFile("./frontal_images.csv")

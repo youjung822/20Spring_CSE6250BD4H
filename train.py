@@ -21,7 +21,7 @@ pathFileTrain = './CheXpert-v1.0-small/train.csv'
 pathFileValid = './CheXpert-v1.0-small/valid.csv'
 
 # Training settings: batch size, maximum number of epochs
-batch_size = 32
+batch_size = 16
 max_epoch = 1
 
 # Parameters related to image transforms: size of the down-scaled image, cropped image
@@ -46,9 +46,9 @@ dataset = CheXpertDataSet(pathFileTrain, transformSequence, policy="ones")
 datasetValid, datasetTrain = random_split(dataset, [500, len(dataset) - 500])
 datasetTest = CheXpertDataSet(pathFileValid, transformSequence)
 
-dataLoaderTrain = DataLoader(dataset=datasetTrain, batch_size=batch_size, shuffle=True, num_workers=20, pin_memory=True)
-dataLoaderVal = DataLoader(dataset=datasetValid, batch_size=batch_size, shuffle=False, num_workers=20, pin_memory=True)
-dataLoaderTest = DataLoader(dataset=datasetTest, num_workers=24, pin_memory=True)
+dataLoaderTrain = DataLoader(dataset=datasetTrain, batch_size=batch_size, shuffle=True, num_workers=8, pin_memory=True)
+dataLoaderVal = DataLoader(dataset=datasetValid, batch_size=batch_size, shuffle=False, num_workers=8, pin_memory=True)
+dataLoaderTest = DataLoader(dataset=datasetTest, num_workers=8, pin_memory=True)
 
 # initialize and load the model
 if use_gpu:
@@ -72,8 +72,10 @@ def main():
     print("Training Loss (All):\n", losst)
 
     losstn = []
-    for i in range(0, len(losst), len(losst) // 100):
-        losstn.append(np.mean(losst[i:i+len(losst) // 100]))
+    j = 0
+    for i in range(0, len(losse)):
+        losstn.append(np.mean(losst[j:j+len(losst) // len(losse)]))
+        j += len(losst) // len(losse)
 
     print("Training Loss:\n", losstn)
     print("Evaluation Loss:\n", losse)
@@ -81,7 +83,7 @@ def main():
 
     lt = losstn
     le = losse
-    batch = [i*(len(losst) // 100) for i in range(len(lt))]
+    batch = [i*(len(losst) // len(losse)) for i in range(len(le))]
 
     plt.plot(batch, lt, label="train")
     plt.plot(batch, le, label="eval")

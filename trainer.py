@@ -87,7 +87,7 @@ class CheXpertTrainer():
                 print("Training loss: %.4f" % l)
                 print("Evaluation loss: %.4f" % le)
                 # for testing
-                # if percentage == 1:
+                # if percentage == 3:
                 #     break
 
         return batch, losstrain, losseval
@@ -144,7 +144,7 @@ class CheXpertTrainer():
         cudnn.benchmark = True
 
         if checkpoint is not None:
-            modelCheckpoint = torch.load(checkpoint, map_location=torch.device('cpu'))
+            modelCheckpoint = torch.load(checkpoint)
             model.load_state_dict(modelCheckpoint['state_dict'])
 
         if use_gpu:
@@ -158,14 +158,15 @@ class CheXpertTrainer():
 
         with torch.no_grad():
             for i, (input, target) in enumerate(dataLoaderTest):
-                target = target
+                if use_gpu:
+                    target = target.cuda(non_blocking=True)
                 outGT = torch.cat((outGT, target), 0)
 
                 bs, c, h, w = input.size()
                 varInput = input.view(-1, c, h, w)
 
                 out = model(varInput)
-                outPRED = torch.cat((outPRED, out), 0)
+                outPRED = torch.cat((outPRED, out), 0).cuda()
         aurocIndividual = CheXpertTrainer.computeAUROC(outGT, outPRED, nnClassCount)
         aurocMean = np.array(aurocIndividual).mean()
 
