@@ -8,7 +8,6 @@ from PIL import Image
 
 from train import nnClassCount
 from train import class_names
-from train import imgtransCrop
 
 use_gpu = torch.cuda.is_available()
 
@@ -20,7 +19,7 @@ class HeatmapGenerator:
     # ---- nnArchitecture - architecture name DENSE-NET121, DENSE-NET169, DENSE-NET201
     # ---- nnClassCount - class count, 14 for chxray-14
 
-    def __init__(self, pathModel, nnClassCount, transCrop):
+    def __init__(self, pathModel, nnClassCount, resize_dim):
 
         # ---- Initialize the network
         model = DenseNet121(nnClassCount).cuda()
@@ -34,6 +33,7 @@ class HeatmapGenerator:
         model.load_state_dict(modelCheckpoint['state_dict'])
 
         self.model = model
+        self.resize_dim = resize_dim
         self.model.eval()
 
         # ---- Initialize the weights
@@ -42,14 +42,14 @@ class HeatmapGenerator:
         # ---- Initialize the image transform
         normalize = transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         transformList = []
-        transformList.append(transforms.Resize((transCrop, transCrop)))
+        transformList.append(transforms.Resize(self.resize_dim))
         transformList.append(transforms.ToTensor())
         transformList.append(normalize)
         self.transformSequence = transforms.Compose(transformList)
 
     # --------------------------------------------------------------------------------
 
-    def generate(self, pathImageFile, pathOutputFile, transCrop):
+    def generate(self, pathImageFile, pathOutputFile):
 
         # ---- Load image, transform, convert
         with torch.no_grad():
@@ -75,10 +75,10 @@ class HeatmapGenerator:
         # ---- Blend original and heatmap
 
         imgOriginal = cv2.imread(pathImageFile, 1)
-        imgOriginal = cv2.resize(imgOriginal, (transCrop, transCrop))
+        imgOriginal = cv2.resize(imgOriginal, self.resize_dim)
 
         cam = npHeatmap / np.max(npHeatmap)
-        cam = cv2.resize(cam, (transCrop, transCrop))
+        cam = cv2.resize(cam, self.resize_dim)
         heatmap = cv2.applyColorMap(np.uint8(255 * cam), cv2.COLORMAP_JET)
 
         img = cv2.addWeighted(imgOriginal, 1, heatmap, 0.35, 0)
@@ -91,11 +91,11 @@ class HeatmapGenerator:
         plt.show()
 
 
-pathInputImage = 'view1_frontal.jpg'
+pathInputImage = './CheXpert-v1.0-small/valid/patient64543/study1/view1_frontal.jpg'
 pathOutputImage = 'heatmap_view1_frontal.png'
-pathModel = "m-epoch0-07032019-213933.pth.tar"
+pathModel = "model_ones_densenet_preprocessed.pth.tar"
 
 
-h = HeatmapGenerator(pathModel, nnClassCount, imgtransCrop)
+h = HeatmapGenerator(pathModel, nnClassCount, (320, 320))
 
-h.generate(pathInputImage, pathOutputImage, imgtransCrop)
+h.generate(pathInputImage, pathOutputImage)

@@ -24,10 +24,6 @@ pathFileValid = './CheXpert-v1.0-small/valid.csv'
 batch_size = 16
 max_epoch = 1
 
-# Parameters related to image transforms: size of the down-scaled image, cropped image
-imgtransResize = (320, 320)
-imgtransCrop = 224
-
 # Class names
 class_names = ['No Finding', 'Enlarged Cardiomediastinum', 'Cardiomegaly', 'Lung Opacity',
                'Lung Lesion', 'Edema', 'Consolidation', 'Pneumonia', 'Atelectasis', 'Pneumothorax',
