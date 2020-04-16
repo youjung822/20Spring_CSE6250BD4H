@@ -16,7 +16,7 @@ class CheXpertTrainer():
         optimizer = optim.Adam(model.parameters(), lr=0.0001, betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-5)
 
         # SETTINGS: LOSS
-        loss = torch.nn.BCELoss(size_average=True)
+        loss = torch.nn.BCEWithLogitsLoss(size_average=True)
         # LOAD CHECKPOINT
         if checkpoint is not None and use_gpu:
             modelCheckpoint = torch.load(checkpoint)

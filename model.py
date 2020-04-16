@@ -18,3 +18,17 @@ class DenseNet121(nn.Module):
     def forward(self, x):
         x = self.densenet121(x)
         return x
+
+
+class Resnet101(nn.Module):
+    """Model modified.
+    The architecture of our model is the same as standard Resnet101
+    except the classifier layer which has an additional sigmoid function.
+    """
+    def __init__(self, out_size):
+        super(Resnet101, self).__init__()
+        self.resnet101 = torchvision.models.resnet101(pretrained=False, num_classes=out_size)
+
+    def forward(self, x):
+        x = self.resnet101(x)
+        return x

@@ -11,6 +11,7 @@ from torch.utils.data import DataLoader
 
 from trainer import CheXpertTrainer
 from model import DenseNet121
+from model import Resnet101
 from dataset import CheXpertDataSet
 
 use_gpu = torch.cuda.is_available()
@@ -48,10 +49,10 @@ dataLoaderTest = DataLoader(dataset=datasetTest, num_workers=8, pin_memory=True)
 
 # initialize and load the model
 if use_gpu:
-    model = DenseNet121(nnClassCount).cuda()
+    model = Resnet101(nnClassCount).cuda()
     model = torch.nn.DataParallel(model).cuda()
 else:
-    model = DenseNet121(nnClassCount)
+    model = Resnet101(nnClassCount)
     model = torch.nn.DataParallel(model)
 
 def main():

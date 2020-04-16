@@ -1,26 +1,32 @@
 from trainer import CheXpertTrainer
 from train import nnClassCount
 from train import dataLoaderTest
-from train import model
+from model import DenseNet121
+from model import Resnet101
+import torch
 from train import class_names
 import matplotlib.pyplot as plt
 import sklearn.metrics as metrics
 
-out_gt_one, out_pred_one = \
+model = Resnet101(nnClassCount).cuda()
+model = torch.nn.DataParallel(model).cuda()
+out_gt_resnet, out_pred_resnet = \
+    CheXpertTrainer.test(model, dataLoaderTest, nnClassCount, "model_ones_resnet.tar", class_names)
+model = DenseNet121(nnClassCount).cuda()
+model = torch.nn.DataParallel(model).cuda()
+out_gt_densenet, out_pred_densenet = \
     CheXpertTrainer.test(model, dataLoaderTest, nnClassCount, "model_ones_densenet_preprocessed.pth.tar", class_names)
-# out_gt_zero, out_pred_zero = \
-#     CheXpertTrainer.test(model, dataLoaderTest, nnClassCount, "model_zeroes_densenet.pth.tar", class_names)
 
 for i in range(nnClassCount):
-    fpr, tpr, threshold = metrics.roc_curve(out_gt_one.cpu()[:, i], out_pred_one.cpu()[:, i])
+    fpr, tpr, threshold = metrics.roc_curve(out_gt_resnet.cpu()[:, i], out_pred_resnet.cpu()[:, i])
     roc_auc = metrics.auc(fpr, tpr)
     f = plt.subplot(2, 7, i+1)
-    # fpr2, tpr2, threshold2 = metrics.roc_curve(out_gt_zero.cpu()[:, i], out_pred_zero.cpu()[:, i])
-    # roc_auc2 = metrics.auc(fpr2, tpr2)
+    fpr2, tpr2, threshold2 = metrics.roc_curve(out_gt_densenet.cpu()[:, i], out_pred_densenet.cpu()[:, i])
+    roc_auc2 = metrics.auc(fpr2, tpr2)
 
     plt.title('ROC for: ' + class_names[i])
-    plt.plot(fpr, tpr, label='U-ones: AUC = %0.2f' % roc_auc)
-    # plt.plot(fpr2, tpr2, label='U-zeros: AUC = %0.2f' % roc_auc2)
+    plt.plot(fpr, tpr, label='Resnet: AUC = %0.2f' % roc_auc)
+    plt.plot(fpr2, tpr2, label='Densenet: AUC = %0.2f' % roc_auc2)
 
     plt.legend(loc='lower right')
     plt.plot([0, 1], [0, 1], 'r--')
