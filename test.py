@@ -1,6 +1,6 @@
 from trainer import CheXpertTrainer
 from train import OUTPUT_CLASS_COUNT
-from train import dataLoaderTest
+from train import test_data
 from model import DenseNet121
 from model import Resnet101
 import torch
@@ -8,13 +8,14 @@ from train import class_names
 import matplotlib.pyplot as plt
 import sklearn.metrics as metrics
 
+# load the test data set for resnet and evaluate
 model1 = Resnet101(OUTPUT_CLASS_COUNT).cuda()
 model1 = torch.nn.DataParallel(model1).cuda()
 out_gt_resnet, out_pred_resnet = \
-    CheXpertTrainer.test(model1, dataLoaderTest, OUTPUT_CLASS_COUNT, "model_ones_resnet.tar", class_names)
+    CheXpertTrainer.test(model1, test_data, OUTPUT_CLASS_COUNT, "model_ones_resnet.tar", class_names)
 model2 = DenseNet121(OUTPUT_CLASS_COUNT).cuda()
 model2 = torch.nn.DataParallel(model2).cuda()
-out_gt_densenet, out_pred_densenet = CheXpertTrainer.test(model2, dataLoaderTest, OUTPUT_CLASS_COUNT,
+out_gt_densenet, out_pred_densenet = CheXpertTrainer.test(model2, test_data, OUTPUT_CLASS_COUNT,
                                                           "model_ones_densenet_preprocessed.pth.tar", class_names)
 
 for i in range(OUTPUT_CLASS_COUNT):

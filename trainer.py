@@ -7,172 +7,148 @@ from sklearn.metrics import roc_auc_score
 
 use_gpu = torch.cuda.is_available()
 
-class CheXpertTrainer():
 
+class CheXpertTrainer:
     @classmethod
-    def train(cls, model, dataLoaderTrain, dataLoaderVal, nnClassCount, trMaxEpoch, launchTimestamp, checkpoint):
+    def train(cls, model, train_data, validation_data, output_class_count, num_epoch, run_time, checkpoint):
 
-        # SETTINGS: OPTIMIZER & SCHEDULER
-        optimizer = optim.Adam(model.parameters(), lr=0.0001, betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-5)
-
-        # SETTINGS: LOSS
+        # optimizer
+        optimizer = optim.Adam(model.parameters(), lr=0.0001, weight_decay=1e-5)
+        # loss
         loss = torch.nn.BCEWithLogitsLoss(size_average=True)
-        # LOAD CHECKPOINT
+
+        # we can resume training from an earlier saved checkpoint
         if checkpoint is not None and use_gpu:
-            modelCheckpoint = torch.load(checkpoint)
-            model.load_state_dict(modelCheckpoint['state_dict'])
-            optimizer.load_state_dict(modelCheckpoint['optimizer'])
+            model_checkpoint = torch.load(checkpoint)
+            model.load_state_dict(model_checkpoint['state_dict'])
+            optimizer.load_state_dict(model_checkpoint['optimizer'])
 
-        # TRAIN THE NETWORK
-        lossMIN = 100000
+        loss_upper_bound = 100000
 
-        for epochID in range(0, trMaxEpoch):
+        for epoch in range(0, num_epoch):
+            batches, losst, losse = CheXpertTrainer.train_epoch(model, train_data, optimizer, num_epoch,
+                                                                output_class_count, loss)
+            lossVal = cls.eval_epoch(model, validation_data, optimizer, num_epoch, output_class_count, loss)
 
-            batchs, losst, losse = CheXpertTrainer.epochTrain(model, dataLoaderTrain, optimizer, trMaxEpoch,
-                                                              nnClassCount, loss)
-            lossVal = cls.epochVal(model, dataLoaderVal, optimizer, trMaxEpoch, nnClassCount, loss)
+            timestamp_end = time.strftime("%d%m%Y") + '-' + time.strftime("%H%M%S")
 
-            timestampTime = time.strftime("%H%M%S")
-            timestampDate = time.strftime("%d%m%Y")
-            timestampEND = timestampDate + '-' + timestampTime
-
-            if lossVal < lossMIN:
-                lossMIN = lossVal
-                torch.save({'epoch': epochID + 1, 'state_dict': model.state_dict(), 'best_loss': lossMIN,
+            if lossVal < loss_upper_bound:
+                loss_upper_bound = lossVal
+                torch.save({'epoch': epoch + 1, 'state_dict': model.state_dict(), 'best_loss': loss_upper_bound,
                             'optimizer': optimizer.state_dict()},
-                           'm-epoch' + str(epochID) + '-' + launchTimestamp + '.pth.tar')
-                print('Epoch [' + str(epochID + 1) + '] [save] [' + timestampEND + '] loss= ' + str(lossVal))
+                           'm-epoch' + str(epoch) + '-' + run_time + '.pth.tar')
+                print('Epoch [' + str(epoch + 1) + '] [save] [' + timestamp_end + '] loss= ' + str(lossVal))
             else:
-                print('Epoch [' + str(epochID + 1) + '] [----] [' + timestampEND + '] loss= ' + str(lossVal))
+                print('Epoch [' + str(epoch + 1) + '] [----] [' + timestamp_end + '] loss= ' + str(lossVal))
 
-            return batchs, losst, losse
-        # --------------------------------------------------------------------------------
+            return batches, losst, losse
 
     @classmethod
-    def epochTrain(cls, model, dataLoader, optimizer, epochMax, classCount, loss):
+    def train_epoch(cls, model, train_data, optimizer, num_epoch, output_class_count, loss):
 
         batch = []
-        losstrain = []
-        losseval = []
+        losst = []
+        lossv = []
 
         model.train()
-        len_training_data =  len(dataLoader)
-        for batchID, (varInput, target) in enumerate(dataLoader):
+        len_training_data = len(train_data)
+        for cur_batch_id, (input_data, target) in enumerate(train_data):
             if use_gpu:
-                varTarget = target.cuda(non_blocking=True)
+                target = target.cuda(non_blocking=True)
             else:
-                varTarget = target
+                target = target
 
-            varOutput = model(varInput)
-            lossvalue = loss(varOutput, varTarget)
+            output = model(input_data)
+            loss_val = loss(output, target)
 
+            # back propagation
             optimizer.zero_grad()
-            lossvalue.backward()
+            loss_val.backward()
             optimizer.step()
 
-            l = lossvalue.item()
-            losstrain.append(l)
+            loss_item = loss_val.item()
+            losst.append(loss_item)
 
-            percentage = batchID // (len_training_data // 100)
-            if batchID % (len_training_data // 100) == 0:
+            percentage = cur_batch_id // (len_training_data // 100)
+            if cur_batch_id % (len_training_data // 100) == 0:
                 print(percentage, "% batches computed")
-                # Fill three arrays to see the evolution of the loss
 
-                batch.append(batchID)
+                batch.append(cur_batch_id)
+                le = cls.eval_epoch(model, train_data, optimizer, num_epoch, output_class_count, loss)
+                lossv.append(le)
 
-                le = cls.epochVal(model, dataLoader, optimizer, epochMax, classCount, loss).item()
-                losseval.append(le)
-
-                print("Batch id: %d" % batchID)
-                print("Training loss: %.4f" % l)
+                print("Batch id: %d" % cur_batch_id)
+                print("Training loss: %.4f" % loss_item)
                 print("Evaluation loss: %.4f" % le)
-                # for testing
-                # if percentage == 3:
-                #     break
 
-        return batch, losstrain, losseval
+        return batch, losst, lossv
 
-    # --------------------------------------------------------------------------------
     @classmethod
-    def epochVal(cls, model, dataLoader, optimizer, epochMax, classCount, loss):
-
+    def eval_epoch(cls, model, input_data, optimizer, num_epoch, output_class_count, loss):
         model.eval()
 
-        lossVal = 0
-        lossValNorm = 0
+        loss_val = 0
+        loss_count = 0
 
         with torch.no_grad():
-            for i, (varInput, target) in enumerate(dataLoader):
+            for i, (varInput, target) in enumerate(input_data):
                 if use_gpu:
                     target = target.cuda(non_blocking=True)
                 else:
                     target = target
-                varOutput = model(varInput)
+                output = model(varInput)
 
-                losstensor = loss(varOutput, target)
-                lossVal += losstensor
-                lossValNorm += 1
+                loss_val += loss(output, target)
+                loss_count += 1
 
-        outLoss = lossVal / lossValNorm
-        return outLoss
+        return loss / loss_count
 
-    # --------------------------------------------------------------------------------
-
-    # ---- Computes area under ROC curve
-    # ---- dataGT - ground truth data
-    # ---- dataPRED - predicted data
-    # ---- classCount - number of classes
     @classmethod
-    def computeAUROC(cls, data_truth, data_pred, class_count):
-
-        outAUROC = []
-
-        datanpGT = data_truth.cpu().numpy()
-        datanpPRED = data_pred.cpu().numpy()
+    def compute_area_under_roc(cls, data_truth, data_pred, class_count):
+        result = []
+        data_gt = data_truth.cpu().numpy()
+        data_pred = data_pred.cpu().numpy()
 
         for i in range(class_count):
             try:
-                outAUROC.append(roc_auc_score(datanpGT[:, i], datanpPRED[:, i]))
+                result.append(roc_auc_score(data_gt[:, i], data_pred[:, i]))
             except ValueError:
                 pass
-        return outAUROC
+        return result
 
-    # --------------------------------------------------------------------------------
     @classmethod
-    def test(cls, model, dataLoaderTest, nnClassCount, checkpoint, class_names):
-
+    def test(cls, model, test_data, output_class_count, checkpoint, class_names):
         cudnn.benchmark = True
 
         if checkpoint is not None:
-            modelCheckpoint = torch.load(checkpoint)
-            model.load_state_dict(modelCheckpoint['state_dict'])
+            model_checkpoint = torch.load(checkpoint)
+            model.load_state_dict(model_checkpoint['state_dict'])
 
         if use_gpu:
-            outGT = torch.FloatTensor().cuda()
-            outPRED = torch.FloatTensor().cuda()
+            out_gt = torch.FloatTensor().cuda()
+            out_pred = torch.FloatTensor().cuda()
         else:
-            outGT = torch.FloatTensor()
-            outPRED = torch.FloatTensor()
+            out_gt = torch.FloatTensor()
+            out_pred = torch.FloatTensor()
 
         model.eval()
 
         with torch.no_grad():
-            for i, (input, target) in enumerate(dataLoaderTest):
+            for i, (input_data, target) in enumerate(test_data):
                 if use_gpu:
                     target = target.cuda(non_blocking=True)
-                outGT = torch.cat((outGT, target), 0)
+                out_gt = torch.cat((out_gt, target), 0)
 
-                bs, c, h, w = input.size()
-                varInput = input.view(-1, c, h, w)
+                bs, c, h, w = input_data.size()
 
-                out = model(varInput)
-                outPRED = torch.cat((outPRED, out), 0).cuda()
-        aurocIndividual = CheXpertTrainer.computeAUROC(outGT, outPRED, nnClassCount)
-        aurocMean = np.array(aurocIndividual).mean()
+                out = model(input_data.view(-1, c, h, w))
+                out_pred = torch.cat((out_pred, out), 0).cuda()
+        area_single = CheXpertTrainer.compute_area_under_roc(out_gt, out_pred, output_class_count)
+        area_mean = np.array(area_single).mean()
 
-        print('AUROC mean ', aurocMean)
+        print('AUROC mean ', area_mean)
 
-        for i in range(0, len(aurocIndividual)):
-            print(class_names[i], ' ', aurocIndividual[i])
+        for i in range(0, len(area_single)):
+            print(class_names[i], ' ', area_single[i])
 
-        return outGT, outPRED
+        return out_gt, out_pred

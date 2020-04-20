@@ -6,25 +6,22 @@ from os import path
 
 
 class CheXpertDataSet(Dataset):
-    def __init__(self, image_list_file, transform=None, policy="ones"):
-        """
-        image_list_file: path to the file containing images with corresponding labels.
-        transform: optional transform to be applied on a sample.
-        Upolicy: name the policy with regard to the uncertain labels
-        """
+    # policy is how we treat unknown labels
+    # "ones" means we treat them as positive, "zeros" means we treat them as negative
+    def __init__(self, image_file_list, transform=None, policy="ones"):
         image_names = []
         labels = []
-
-        with open(image_list_file, "r") as f:
-            csvReader = csv.reader(f)
-            next(csvReader, None)
+        from train import OUTPUT_CLASS_COUNT
+        with open(image_file_list, "r") as f:
+            csv_reader = csv.reader(f)
+            next(csv_reader, None)
             k = 0
-            for line in csvReader:
+            for line in csv_reader:
                 k += 1
                 image_name = line[0]
                 label = line[5:]
 
-                for i in range(14):
+                for i in range(OUTPUT_CLASS_COUNT):
                     if label[i]:
                         a = float(label[i])
                         if a == 1:
@@ -40,7 +37,6 @@ class CheXpertDataSet(Dataset):
                             label[i] = 0
                     else:
                         label[i] = 0
-
 
                 image_name = './' + image_name
                 dir_list = image_name.split('/')

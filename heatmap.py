@@ -8,6 +8,7 @@ from PIL import Image
 
 from train import OUTPUT_CLASS_COUNT
 from train import class_names
+from train import NORMALIZE_FACTOR
 
 
 class HeatmapGenerator:
@@ -28,7 +29,7 @@ class HeatmapGenerator:
         self.model.eval()
         self.weights = list(self.model.module.densenet121.features.parameters())[-2]
 
-        normalize = transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        normalize = transforms.Normalize(NORMALIZE_FACTOR[0], NORMALIZE_FACTOR[1])
         transform_list = [transforms.Resize(self.resize_dim), transforms.ToTensor(), normalize]
         self.transformSequence = transforms.Compose(transform_list)
 
