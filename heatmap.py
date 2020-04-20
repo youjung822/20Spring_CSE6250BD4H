@@ -6,96 +6,73 @@ import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
 
-from train import nnClassCount
+from train import OUTPUT_CLASS_COUNT
 from train import class_names
-
-use_gpu = torch.cuda.is_available()
 
 
 class HeatmapGenerator:
 
-    # ---- Initialize heatmap generator
-    # ---- pathModel - path to the trained densenet model
-    # ---- nnArchitecture - architecture name DENSE-NET121, DENSE-NET169, DENSE-NET201
-    # ---- nnClassCount - class count, 14 for chxray-14
+    def __init__(self, path_to_model, output_class_count, resize_dim):
+        self.use_gpu = torch.cuda.is_available()
+        model = DenseNet121(output_class_count).cuda()
 
-    def __init__(self, pathModel, nnClassCount, resize_dim):
-
-        # ---- Initialize the network
-        model = DenseNet121(nnClassCount).cuda()
-
-        if use_gpu:
+        if self.use_gpu:
             model = torch.nn.DataParallel(model).cuda()
         else:
             model = torch.nn.DataParallel(model)
-
-        modelCheckpoint = torch.load(pathModel)
-        model.load_state_dict(modelCheckpoint['state_dict'])
+        # load the saved model state_dict
+        model.load_state_dict(torch.load(path_to_model)['state_dict'])
 
         self.model = model
         self.resize_dim = resize_dim
         self.model.eval()
-
-        # ---- Initialize the weights
         self.weights = list(self.model.module.densenet121.features.parameters())[-2]
 
-        # ---- Initialize the image transform
         normalize = transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-        transformList = []
-        transformList.append(transforms.Resize(self.resize_dim))
-        transformList.append(transforms.ToTensor())
-        transformList.append(normalize)
-        self.transformSequence = transforms.Compose(transformList)
+        transform_list = [transforms.Resize(self.resize_dim), transforms.ToTensor(), normalize]
+        self.transformSequence = transforms.Compose(transform_list)
 
-    # --------------------------------------------------------------------------------
+    def generate(self, input_file, output_file):
 
-    def generate(self, pathImageFile, pathOutputFile):
-
-        # ---- Load image, transform, convert
+        # load the image and pass to the model
         with torch.no_grad():
+            image = Image.open(input_file).convert('RGB')
+            image = self.transformSequence(image)
+            image = image.unsqueeze_(0)
+            if self.use_gpu:
+                image = image.cuda()
+            label = self.model(image)
+            output = self.model.module.densenet121.features(image)
+            label = class_names[torch.max(label, 1)[1]]
 
-            imageData = Image.open(pathImageFile).convert('RGB')
-            imageData = self.transformSequence(imageData)
-            imageData = imageData.unsqueeze_(0)
-            if use_gpu:
-                imageData = imageData.cuda()
-            l = self.model(imageData)
-            output = self.model.module.densenet121.features(imageData)
-            label = class_names[torch.max(l, 1)[1]]
-            # ---- Generate heatmap
-            heatmap = None
+            # generate heatmap
             for i in range(0, len(self.weights)):
-                map = output[0, i, :, :]
+                cur_output = output[0, i, :, :]
                 if i == 0:
-                    heatmap = self.weights[i] * map
+                    ith_heatmap = self.weights[i] * cur_output
                 else:
-                    heatmap += self.weights[i] * map
-                npHeatmap = heatmap.cpu().data.numpy()
+                    ith_heatmap += self.weights[i] * cur_output
+                np_heatmap = ith_heatmap.cpu().data.numpy()
 
-        # ---- Blend original and heatmap
-
-        imgOriginal = cv2.imread(pathImageFile, 1)
-        imgOriginal = cv2.resize(imgOriginal, self.resize_dim)
-
-        cam = npHeatmap / np.max(npHeatmap)
+        # blend image and heatmap
+        orig_image = cv2.resize(cv2.imread(input_file, 1), self.resize_dim)
+        cam = np_heatmap / np.max(np_heatmap)
         cam = cv2.resize(cam, self.resize_dim)
         heatmap = cv2.applyColorMap(np.uint8(255 * cam), cv2.COLORMAP_JET)
 
-        img = cv2.addWeighted(imgOriginal, 1, heatmap, 0.35, 0)
+        img = cv2.addWeighted(orig_image, 1, heatmap, 0.35, 0)
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         plt.title(label)
         plt.imshow(img)
         plt.plot()
         plt.axis('off')
-        plt.savefig(pathOutputFile)
+        plt.savefig(output_file)
         plt.show()
 
 
-pathInputImage = './CheXpert-v1.0-small/valid/patient64543/study1/view1_frontal.jpg'
-pathOutputImage = 'heatmap_view1_frontal.png'
-pathModel = "model_ones_densenet_preprocessed.pth.tar"
+def main():
+    input_image = './CheXpert-v1.0-small/valid/patient64543/study1/view1_frontal.jpg'
+    output_image = 'heatmap_view1_frontal.png'
+    path_to_model = "model_ones_densenet_preprocessed.pth.tar"
 
-
-h = HeatmapGenerator(pathModel, nnClassCount, (320, 320))
-
-h.generate(pathInputImage, pathOutputImage)
+    HeatmapGenerator(path_to_model, OUTPUT_CLASS_COUNT, (320, 320)).generate(input_image, output_image)

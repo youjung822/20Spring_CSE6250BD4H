@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 
 from trainer import CheXpertTrainer
 from model import DenseNet121
-from model import Resnet101
+# from model import Resnet101
 from dataset import CheXpertDataSet
 
 use_gpu = torch.cuda.is_available()
@@ -29,7 +29,7 @@ max_epoch = 1
 class_names = ['No Finding', 'Enlarged Cardiomediastinum', 'Cardiomegaly', 'Lung Opacity',
                'Lung Lesion', 'Edema', 'Consolidation', 'Pneumonia', 'Atelectasis', 'Pneumothorax',
                'Pleural Effusion', 'Pleural Other', 'Fracture', 'Support Devices']
-nnClassCount = len(class_names)                   # dimension of the output
+OUTPUT_CLASS_COUNT = len(class_names)                   # dimension of the output
 
 # TRANSFORM DATA
 
@@ -49,19 +49,19 @@ dataLoaderTest = DataLoader(dataset=datasetTest, num_workers=8, pin_memory=True)
 
 # initialize and load the model
 if use_gpu:
-    model = Resnet101(nnClassCount).cuda()
+    model = DenseNet121(OUTPUT_CLASS_COUNT).cuda()
     model = torch.nn.DataParallel(model).cuda()
 else:
-    model = Resnet101(nnClassCount)
+    model = DenseNet121(OUTPUT_CLASS_COUNT)
     model = torch.nn.DataParallel(model)
 
-def main():
 
+def main():
     timestampTime = time.strftime("%H%M%S")
     timestampDate = time.strftime("%d%m%Y")
     timestampLaunch = timestampDate + '-' + timestampTime
 
-    batch, losst, losse = CheXpertTrainer.train(model, dataLoaderTrain, dataLoaderVal, nnClassCount, max_epoch,
+    batch, losst, losse = CheXpertTrainer.train(model, dataLoaderTrain, dataLoaderVal, OUTPUT_CLASS_COUNT, max_epoch,
                                                 timestampLaunch, checkpoint=None)
     print("Model trained")
 
@@ -76,7 +76,6 @@ def main():
 
     print("Training Loss:\n", losstn)
     print("Evaluation Loss:\n", losse)
-
 
     lt = losstn
     le = losse
